@@ -33,9 +33,22 @@ export function matchPlayers(
       continue;
     }
 
-    // Apply tiebreakers if we have position or team info
+    // Among close matches, prefer active players (those with a team) over free agents
+    // This prevents "TJ Watt" matching retired "J.J. Watt" instead of active "T.J. Watt"
     let best = results[0];
 
+    // First: if scores are close, prefer players on active NFL rosters
+    const CLOSE_SCORE_THRESHOLD = 0.15;
+    const activeResults = results.filter(r => r.item.team != null);
+    if (activeResults.length > 0 && best.item.team == null) {
+      const bestActiveScore = activeResults[0].score ?? 1;
+      const bestScore = best.score ?? 1;
+      if (bestActiveScore - bestScore < CLOSE_SCORE_THRESHOLD) {
+        best = activeResults[0];
+      }
+    }
+
+    // Then: apply position/team tiebreakers if provided
     if (player.position || player.team) {
       const filtered = results.filter((r) => {
         const p = r.item;
