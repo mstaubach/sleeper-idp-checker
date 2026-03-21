@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sleeper IDP Availability Checker
+
+Check IDP (Individual Defensive Player) availability in your Sleeper fantasy football league. Paste rankings from sites like PFF, upload a CSV, or manually enter players — the tool checks each one against your league's rosters.
+
+## Features
+
+- **Three input methods**: Paste text, upload CSV/TXT, or manual entry with autocomplete
+- **Fuzzy name matching**: Handles variations like "Pat Queen" vs "Patrick Queen" vs "P. Queen"
+- **Position filtering**: Filter by LB, DL (DE/DT), or DB (CB/S)
+- **Availability toggle**: Show all players or available only
+- **Waiver info**: FAAB budgets or rolling waiver priority
+- **Unmatched player reporting**: See which names couldn't be matched
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- npm
+
+### Local Development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Running Tests
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm test
+```
 
-## Learn More
+### Configuration
 
-To learn more about Next.js, take a look at the following resources:
+Enter your Sleeper league ID in the input field at the top of the page. You can find your league ID in the Sleeper app URL.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Tech Stack
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Next.js 14 (App Router)
+- TypeScript
+- Tailwind CSS
+- fuse.js (fuzzy matching)
+- Sleeper API (public, no auth required)
 
-## Deploy on Vercel
+## Deployment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Deploy to Vercel — just import from GitHub and it auto-detects the Next.js config.
