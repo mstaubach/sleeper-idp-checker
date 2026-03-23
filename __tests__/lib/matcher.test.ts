@@ -65,6 +65,17 @@ describe('matchPlayers', () => {
     expect(matched[0].matchedPlayer?.name).toBe('Devin White');
   });
 
+  it('prefers first-name match over active-roster player with same last name', () => {
+    const playersWithActive: SleeperPlayer[] = [
+      { player_id: '6', full_name: 'Devin White', first_name: 'Devin', last_name: 'White', position: 'LB', team: null, active: true },
+      { player_id: '10', full_name: 'Brendon White', first_name: 'Brendon', last_name: 'White', position: 'LB', team: 'NYJ', active: true },
+    ];
+    const input: ParsedPlayer[] = [{ name: 'Devin White', rank: 1 }];
+    const { matched } = matchPlayers(input, playersWithActive);
+    expect(matched).toHaveLength(1);
+    expect(matched[0].matchedPlayer?.name).toBe('Devin White');
+  });
+
   it('matches Lavonte David correctly, not Elliott Davison', () => {
     const input: ParsedPlayer[] = [{ name: 'Lavonte David', rank: 1 }];
     const { matched } = matchPlayers(input, mockPlayers);

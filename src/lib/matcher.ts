@@ -35,17 +35,6 @@ function applyTiebreakers(
 ): Fuse.FuseResult<SleeperPlayer> {
   let best = results[0];
 
-  // Prefer active players (those with a team) over free agents when scores are close
-  const CLOSE_SCORE_THRESHOLD = 0.15;
-  const activeResults = results.filter(r => r.item.team != null);
-  if (activeResults.length > 0 && best.item.team == null) {
-    const bestActiveScore = activeResults[0].score ?? 1;
-    const bestScore = best.score ?? 1;
-    if (bestActiveScore - bestScore < CLOSE_SCORE_THRESHOLD) {
-      best = activeResults[0];
-    }
-  }
-
   // Apply position/team tiebreakers if provided
   if (player.position || player.team) {
     const filtered = results.filter((r) => {
@@ -127,11 +116,14 @@ export function matchPlayers(
       // Among fallback results, prefer those whose first name starts with the input first name
       const firstNamePrefix = nameParts.length > 1 ? nameParts[0].toLowerCase() : '';
       if (firstNamePrefix) {
-        const prefixMatch = fallbackResults.find(r =>
+        // Find all candidates whose first name starts with the input prefix
+        const prefixMatches = fallbackResults.filter(r =>
           r.item.first_name.toLowerCase().startsWith(firstNamePrefix)
         );
-        if (prefixMatch) {
-          const best = applyTiebreakers([prefixMatch, ...fallbackResults.filter(r => r !== prefixMatch)], player);
+        if (prefixMatches.length > 0) {
+          // Use the prefix match directly — first-name match is a stronger signal
+          // than active-roster status (e.g. "Devin White" should match the LB, not "Brendon White")
+          const best = prefixMatches.length > 1 ? applyTiebreakers(prefixMatches, player) : prefixMatches[0];
           matched.push(buildResult(player, best));
           continue;
         }
