@@ -17,7 +17,7 @@ export default function LeagueInput({ leagueId, onChange }: LeagueInputProps) {
         value={leagueId}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Enter your Sleeper league ID"
-        className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
       />
     </div>
   );
