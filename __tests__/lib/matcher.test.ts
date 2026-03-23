@@ -8,6 +8,10 @@ const mockPlayers: SleeperPlayer[] = [
   { player_id: '3', full_name: 'Myles Garrett', first_name: 'Myles', last_name: 'Garrett', position: 'DE', team: 'CLE', active: true },
   { player_id: '4', full_name: 'Jordan Smith', first_name: 'Jordan', last_name: 'Smith', position: 'DE', team: 'JAX', active: true },
   { player_id: '5', full_name: 'Jordan Smith', first_name: 'Jordan', last_name: 'Smith', position: 'LB', team: 'ATL', active: true },
+  { player_id: '6', full_name: 'Devin White', first_name: 'Devin', last_name: 'White', position: 'LB', team: 'PHI', active: true },
+  { player_id: '7', full_name: 'MJ Devonshire', first_name: 'MJ', last_name: 'Devonshire', position: 'CB', team: 'PIT', active: true },
+  { player_id: '8', full_name: 'Lavonte David', first_name: 'Lavonte', last_name: 'David', position: 'LB', team: 'TB', active: true },
+  { player_id: '9', full_name: 'Elliott Davison', first_name: 'Elliott', last_name: 'Davison', position: 'DE', team: null, active: true },
 ];
 
 describe('matchPlayers', () => {
@@ -52,5 +56,19 @@ describe('matchPlayers', () => {
     ];
     const { matched } = matchPlayers(input, mockPlayers);
     expect(matched).toHaveLength(2);
+  });
+
+  it('matches Devin White correctly, not MJ Devonshire', () => {
+    const input: ParsedPlayer[] = [{ name: 'Devin White', rank: 1 }];
+    const { matched } = matchPlayers(input, mockPlayers);
+    expect(matched).toHaveLength(1);
+    expect(matched[0].matchedPlayer?.name).toBe('Devin White');
+  });
+
+  it('matches Lavonte David correctly, not Elliott Davison', () => {
+    const input: ParsedPlayer[] = [{ name: 'Lavonte David', rank: 1 }];
+    const { matched } = matchPlayers(input, mockPlayers);
+    expect(matched).toHaveLength(1);
+    expect(matched[0].matchedPlayer?.name).toBe('Lavonte David');
   });
 });

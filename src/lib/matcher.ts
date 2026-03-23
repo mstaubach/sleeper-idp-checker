@@ -1,92 +1,148 @@
 import Fuse from 'fuse.js';
 import { SleeperPlayer, ParsedPlayer, PlayerResult, POSITION_GROUPS } from './types';
 
-const MATCH_THRESHOLD = 0.4;
+const STRICT_THRESHOLD = 0.3;
+const LOOSE_THRESHOLD = 0.35;
 
 interface MatchResult {
   matched: PlayerResult[];
   unmatched: string[];
 }
 
+function buildResult(
+  player: ParsedPlayer,
+  best: Fuse.FuseResult<SleeperPlayer>
+): PlayerResult {
+  return {
+    inputName: player.name,
+    matchedPlayer: {
+      id: best.item.player_id,
+      name: best.item.full_name,
+      position: best.item.position || 'Unknown',
+      team: best.item.team || 'FA',
+    },
+    matchConfidence: 1 - (best.score ?? 0),
+    rank: player.rank,
+    tier: player.tier,
+    available: true,
+    rosteredBy: null,
+  };
+}
+
+function applyTiebreakers(
+  results: Fuse.FuseResult<SleeperPlayer>[],
+  player: ParsedPlayer
+): Fuse.FuseResult<SleeperPlayer> {
+  let best = results[0];
+
+  // Prefer active players (those with a team) over free agents when scores are close
+  const CLOSE_SCORE_THRESHOLD = 0.15;
+  const activeResults = results.filter(r => r.item.team != null);
+  if (activeResults.length > 0 && best.item.team == null) {
+    const bestActiveScore = activeResults[0].score ?? 1;
+    const bestScore = best.score ?? 1;
+    if (bestActiveScore - bestScore < CLOSE_SCORE_THRESHOLD) {
+      best = activeResults[0];
+    }
+  }
+
+  // Apply position/team tiebreakers if provided
+  if (player.position || player.team) {
+    const filtered = results.filter((r) => {
+      const p = r.item;
+      if (player.position && p.position) {
+        const inputGroup = Object.entries(POSITION_GROUPS).find(([, positions]) =>
+          positions.includes(player.position!)
+        )?.[0];
+        const playerGroup = Object.entries(POSITION_GROUPS).find(([, positions]) =>
+          positions.includes(p.position!)
+        )?.[0];
+        if (inputGroup && playerGroup && inputGroup !== playerGroup) return false;
+        if (!inputGroup && player.position !== p.position) return false;
+      }
+      if (player.team && p.team && player.team.toUpperCase() !== p.team.toUpperCase()) {
+        return false;
+      }
+      return true;
+    });
+    if (filtered.length > 0) {
+      best = filtered[0];
+    }
+  }
+
+  return best;
+}
+
 export function matchPlayers(
   input: ParsedPlayer[],
   sleeperPlayers: SleeperPlayer[]
 ): MatchResult {
-  const fuse = new Fuse(sleeperPlayers, {
+  // Primary search: strict full_name matching
+  const primaryFuse = new Fuse(sleeperPlayers, {
     keys: [
-      { name: 'full_name', weight: 3 },
+      { name: 'full_name', weight: 5 },
       { name: 'last_name', weight: 1 },
       { name: 'first_name', weight: 0.5 },
     ],
-    threshold: MATCH_THRESHOLD,
+    threshold: STRICT_THRESHOLD,
     includeScore: true,
+    ignoreLocation: true,
+    distance: 200,
+  });
+
+  // Fallback search: last-name focused for abbreviated first names (e.g. "Pat Queen")
+  const fallbackFuse = new Fuse(sleeperPlayers, {
+    keys: [
+      { name: 'last_name', weight: 3 },
+      { name: 'first_name', weight: 1 },
+      { name: 'full_name', weight: 1 },
+    ],
+    threshold: LOOSE_THRESHOLD,
+    includeScore: true,
+    ignoreLocation: true,
+    distance: 200,
   });
 
   const matched: PlayerResult[] = [];
   const unmatched: string[] = [];
 
   for (const player of input) {
-    const results = fuse.search(player.name);
+    // Pass 1: strict full_name match
+    const results = primaryFuse.search(player.name);
 
-    if (results.length === 0) {
-      unmatched.push(player.name);
+    if (results.length > 0) {
+      const best = applyTiebreakers(results, player);
+      matched.push(buildResult(player, best));
       continue;
     }
 
-    // Among close matches, prefer active players (those with a team) over free agents
-    // This prevents "TJ Watt" matching retired "J.J. Watt" instead of active "T.J. Watt"
-    let best = results[0];
+    // Pass 2: fallback last-name-focused search
+    // Split input name and try matching by last name token
+    const nameParts = player.name.trim().split(/\s+/);
+    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : player.name;
 
-    // First: if scores are close, prefer players on active NFL rosters
-    const CLOSE_SCORE_THRESHOLD = 0.15;
-    const activeResults = results.filter(r => r.item.team != null);
-    if (activeResults.length > 0 && best.item.team == null) {
-      const bestActiveScore = activeResults[0].score ?? 1;
-      const bestScore = best.score ?? 1;
-      if (bestActiveScore - bestScore < CLOSE_SCORE_THRESHOLD) {
-        best = activeResults[0];
+    const fallbackResults = fallbackFuse.search(lastName);
+
+    if (fallbackResults.length > 0) {
+      // Among fallback results, prefer those whose first name starts with the input first name
+      const firstNamePrefix = nameParts.length > 1 ? nameParts[0].toLowerCase() : '';
+      if (firstNamePrefix) {
+        const prefixMatch = fallbackResults.find(r =>
+          r.item.first_name.toLowerCase().startsWith(firstNamePrefix)
+        );
+        if (prefixMatch) {
+          const best = applyTiebreakers([prefixMatch, ...fallbackResults.filter(r => r !== prefixMatch)], player);
+          matched.push(buildResult(player, best));
+          continue;
+        }
       }
+
+      const best = applyTiebreakers(fallbackResults, player);
+      matched.push(buildResult(player, best));
+      continue;
     }
 
-    // Then: apply position/team tiebreakers if provided
-    if (player.position || player.team) {
-      const filtered = results.filter((r) => {
-        const p = r.item;
-        if (player.position && p.position) {
-          // Check direct match or same position group
-          const inputGroup = Object.entries(POSITION_GROUPS).find(([, positions]) =>
-            positions.includes(player.position!)
-          )?.[0];
-          const playerGroup = Object.entries(POSITION_GROUPS).find(([, positions]) =>
-            positions.includes(p.position!)
-          )?.[0];
-          if (inputGroup && playerGroup && inputGroup !== playerGroup) return false;
-          if (!inputGroup && player.position !== p.position) return false;
-        }
-        if (player.team && p.team && player.team.toUpperCase() !== p.team.toUpperCase()) {
-          return false;
-        }
-        return true;
-      });
-      if (filtered.length > 0) {
-        best = filtered[0];
-      }
-    }
-
-    matched.push({
-      inputName: player.name,
-      matchedPlayer: {
-        id: best.item.player_id,
-        name: best.item.full_name,
-        position: best.item.position || 'Unknown',
-        team: best.item.team || 'FA',
-      },
-      matchConfidence: 1 - (best.score ?? 0),
-      rank: player.rank,
-      tier: player.tier,
-      available: true, // Will be set by availability check
-      rosteredBy: null,
-    });
+    unmatched.push(player.name);
   }
 
   return { matched, unmatched };
